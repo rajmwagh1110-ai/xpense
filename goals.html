@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Goals</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo"><h1>XPense</h1><span>Tracker</span></div>
+  <span class="nav-section">Menu</span>
+  <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
+  <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
+  <a href="expenses.html" class="nav-link"><span class="nav-icon">≡</span><span>All Expenses</span></a>
+  <a href="budget.html" class="nav-link"><span class="nav-icon">◎</span><span>Budget Settings</span></a>
+  <a href="reports.html" class="nav-link"><span class="nav-icon">↗</span><span>Reports</span></a>
+  <a href="goals.html" class="nav-link"><span class="nav-icon">🎯</span><span>Goals</span></a>
+  <a href="settings.html" class="nav-link"><span class="nav-icon">⚙</span><span>Settings</span></a>
+</nav>
+
+<main class="main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Savings Goals</div>
+      <div class="page-subtitle">Track progress towards your financial targets</div>
+    </div>
+    <button class="btn btn-primary" onclick="openGoalModal()">＋ Add Goal</button>
+  </div>
+
+  <section class="goal-sample-panel">
+    <div class="panel-header">
+      <div class="panel-title">Professional Goal Examples</div>
+      <div class="panel-subtitle">Structured targets for important milestones.</div>
+    </div>
+    <div class="goal-sample-grid">
+      <article class="sample-card">
+        <div class="sample-card-title">Emergency Reserve</div>
+        <div class="sample-card-meta">₹25,000 target · ₹10,500 saved</div>
+        <div class="sample-card-note">Create a backup fund for unexpected bills with a clear monthly savings plan.</div>
+      </article>
+      <article class="sample-card">
+        <div class="sample-card-title">Home Improvement</div>
+        <div class="sample-card-meta">₹60,000 target · ₹18,000 saved</div>
+        <div class="sample-card-note">Allocate disciplined savings toward upgrades without disrupting daily spending.</div>
+      </article>
+      <article class="sample-card">
+        <div class="sample-card-title">Professional Growth</div>
+        <div class="sample-card-meta">₹40,000 target · ₹14,200 saved</div>
+        <div class="sample-card-note">Fund a high-value course or certification while tracking progress visually.</div>
+      </article>
+    </div>
+  </section>
+
+  <div id="goalsList" class="goals-grid"></div>
+
+  <div id="emptyGoals" style="display:none">
+    <div class="empty-state">
+      <span class="emoji">🎯</span>
+      <p>No goals yet.<br>Set a savings goal to start tracking!</p>
+    </div>
+  </div>
+</main>
+
+<!-- Goal Modal -->
+<div id="goalModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" id="modalTitle">New Goal</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Goal Name</label>
+        <input type="text" id="goalName" class="form-input" placeholder="e.g. Emergency Fund, Laptop…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Amount (₹)</label>
+        <input type="number" id="goalTarget" class="form-input" placeholder="50000" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Current Savings (₹)</label>
+        <input type="number" id="goalCurrent" class="form-input" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Emoji Icon</label>
+        <input type="text" id="goalIcon" class="form-input" placeholder="🎯" maxlength="2">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Date (optional)</label>
+        <input type="date" id="goalDate" class="form-input">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveGoal()">💾 Save</button>
+      <button class="btn btn-outline" onclick="closeGoalModal()">Cancel</button>
+      <button id="goalDeleteBtn" class="btn btn-danger" onclick="deleteGoal()">✕ Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let editGoalId = null;
+
+document.addEventListener('DOMContentLoaded', renderGoals);
+
+function renderGoals() {
+  const goals = DB.getGoals();
+  const list = document.getElementById('goalsList');
+  const empty = document.getElementById('emptyGoals');
+
+  if (goals.length === 0) {
+    list.innerHTML = '';
+    list.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  list.style.display = 'grid';
+  empty.style.display = 'none';
+
+  list.innerHTML = goals.map(g => {
+    const pct = Math.min((Number(g.current) / Number(g.target)) * 100, 100);
+    const done = pct >= 100;
+    const remaining = Math.max(0, Number(g.target) - Number(g.current));
+    let deadlineLabel = '';
+    let paceText = '';
+    let statusText = '';
+
+    if (g.deadline) {
+      const days = Math.ceil((new Date(g.deadline) - new Date()) / 86400000);
+      deadlineLabel = days >= 0 ? `${days} days left` : 'Deadline passed';
+      if (!done && remaining > 0 && days > 0) {
+        const weeksLeft = Math.max(1, Math.ceil(days / 7));
+        const weeklyNeed = Math.ceil(remaining / weeksLeft);
+        paceText = `Save ${fmt(weeklyNeed)} / week`;
+        statusText = weeklyNeed <= 2000 ? 'On track' : 'Needs extra effort';
+      }
+    }
+
+    return `
+    <div class="goal-card ${done ? 'completed' : ''}" onclick="openGoalModal('${g.id}')">
+      <div class="goal-card-header">
+        <div class="goal-icon">${g.icon || '🎯'}</div>
+        ${done ? '<span class="goal-badge goal-badge-success">✓ Completed</span>' : ''}
+      </div>
+      <div class="goal-name">${g.name}</div>
+      <div class="goal-details">
+        ${deadlineLabel ? `<span class="goal-badge ${done ? 'goal-badge-success' : deadlineLabel === 'Deadline passed' ? 'goal-badge-warning' : 'goal-badge-accent'}">${deadlineLabel}</span>` : ''}
+        ${paceText ? `<span class="goal-note">${paceText}</span>` : ''}
+        ${statusText ? `<span class="goal-status">${statusText}</span>` : ''}
+      </div>
+      <div class="goal-amounts">
+        <strong>${fmt(g.current)}</strong> / ${fmt(g.target)}
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" style="width:${pct}%;background:${done ? 'var(--food)' : 'var(--accent)'}"></div>
+      </div>
+      <div class="goal-summary">
+        <span>${pct.toFixed(1)}% complete</span>
+        ${!done ? `<span>${fmt(remaining)} to go</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openGoalModal(id = null) {
+  editGoalId = id;
+  const modal = document.getElementById('goalModal');
+  modal.style.display = 'flex';
+  document.getElementById('goalDeleteBtn').style.display = 'none';
+  document.getElementById('modalTitle').textContent = id ? 'Edit Goal' : 'New Goal';
+
+  if (id) {
+    const g = DB.getGoals().find(g => g.id === id);
+    if (g) {
+      document.getElementById('goalName').value = g.name || '';
+      document.getElementById('goalTarget').value = g.target || '';
+      document.getElementById('goalCurrent').value = g.current || 0;
+      document.getElementById('goalIcon').value = g.icon || '🎯';
+      document.getElementById('goalDate').value = g.deadline || '';
+      document.getElementById('goalDeleteBtn').style.display = 'flex';
+    }
+  } else {
+    document.getElementById('goalName').value = '';
+    document.getElementById('goalTarget').value = '';
+    document.getElementById('goalCurrent').value = '';
+    document.getElementById('goalIcon').value = '🎯';
+    document.getElementById('goalDate').value = '';
+  }
+}
+
+function closeGoalModal() {
+  document.getElementById('goalModal').style.display = 'none';
+  editGoalId = null;
+}
+
+function saveGoal() {
+  const name = document.getElementById('goalName').value.trim();
+  const target = parseFloat(document.getElementById('goalTarget').value);
+  const current = parseFloat(document.getElementById('goalCurrent').value) || 0;
+  const icon = document.getElementById('goalIcon').value || '🎯';
+  const deadline = document.getElementById('goalDate').value;
+
+  if (!name) { showToast('Enter a goal name', 'error'); return; }
+  if (!target || target <= 0) { showToast('Enter a valid target amount', 'error'); return; }
+
+  const goals = DB.getGoals();
+  if (editGoalId) {
+    const idx = goals.findIndex(g => g.id === editGoalId);
+    if (idx !== -1) goals[idx] = { ...goals[idx], name, target, current, icon, deadline };
+  } else {
+    goals.push({ id: Date.now().toString(), name, target, current, icon, deadline, createdAt: new Date().toISOString() });
+  }
+  DB.saveGoals(goals);
+  showToast(editGoalId ? 'Goal updated!' : 'Goal created!');
+  closeGoalModal();
+  renderGoals();
+}
+
+function deleteGoal() {
+  if (!editGoalId || !confirm('Delete this goal?')) return;
+  DB.saveGoals(DB.getGoals().filter(g => g.id !== editGoalId));
+  showToast('Goal deleted');
+  closeGoalModal();
+  renderGoals();
+}
+
+// Close modal on backdrop click
+document.getElementById('goalModal').addEventListener('click', function(e) {
+  if (e.target === this) closeGoalModal();
+});
+</script>
+</body>
+</html>

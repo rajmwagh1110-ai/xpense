@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo"><h1>XPense</h1><span>Tracker</span></div>
+  <span class="nav-section">Menu</span>
+  <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
+  <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
+  <a href="expenses.html" class="nav-link"><span class="nav-icon">≡</span><span>All Expenses</span></a>
+  <a href="budget.html" class="nav-link"><span class="nav-icon">◎</span><span>Budget Settings</span></a>
+  <a href="reports.html" class="nav-link"><span class="nav-icon">↗</span><span>Reports</span></a>
+  <a href="goals.html" class="nav-link"><span class="nav-icon">🎯</span><span>Goals</span></a>
+  <a href="settings.html" class="nav-link"><span class="nav-icon">⚙</span><span>Settings</span></a>
+</nav>
+
+<main class="main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Dashboard</div>
+      <div class="page-subtitle" id="monthLabel">Loading…</div>
+    </div>
+    <a href="add.html" class="btn btn-primary">＋ Add Expense</a>
+  </div>
+
+  <section class="dashboard-hero">
+    <div class="hero-card">
+      <div class="hero-top">
+        <div>
+          <div class="hero-title">Financial pulse</div>
+          <div class="hero-text">A focused snapshot of spending, budget health, and category momentum.</div>
+        </div>
+        <span class="hero-badge">Live view</span>
+      </div>
+      <div class="hero-metrics">
+        <div class="hero-metric">
+          <span class="hero-metric-label">Budget usage</span>
+          <strong id="heroBudgetUsage">0%</strong>
+        </div>
+        <div class="hero-metric">
+          <span class="hero-metric-label">Top category</span>
+          <strong id="heroTopCategory">None</strong>
+        </div>
+        <div class="hero-metric">
+          <span class="hero-metric-label">Projected balance</span>
+          <strong id="heroProjectedBalance">₹0</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Insights -->
+  <div class="insights-panel" id="insightsPanel" style="display:none">
+    <div class="insights-title">🧠 Spending Insights</div>
+    <div class="insights-list" id="insightsList"></div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="cards-grid" id="summaryCards"></div>
+
+  <!-- Weekly Trend -->
+  <div class="chart-card weekly-trend-card">
+    <div class="chart-title">Weekly Spending Trend</div>
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Spending by Category</div>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Category Split</div>
+      <div class="donut-wrap"><canvas id="donutChart"></canvas></div>
+      <div class="cat-legend" id="catLegend"></div>
+    </div>
+  </div>
+
+  <!-- Budget Progress -->
+  <div class="chart-card budget-progress-card">
+    <div class="budget-card-header">
+      <div class="chart-title">Budget Progress</div>
+      <span class="forecast-label">Forecast: <strong id="forecastAmt"></strong></span>
+    </div>
+    <div class="progress-list" id="budgetProgress"></div>
+  </div>
+
+  <!-- Recent Expenses -->
+  <div class="table-card">
+    <div class="table-toolbar">
+      <h2>Recent Expenses</h2>
+      <a href="expenses.html" class="btn btn-outline btn-small">View All →</a>
+    </div>
+    <div id="recentTable"></div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const month = currentMonth();
+  const expenses = DB.getExpenses();
+  const budgets = DB.getBudgets();
+  const catTotals = totalByCategory(month, expenses);
+  const totalSpent = totalForMonth(month, expenses);
+  const totalBudget = Object.values(budgets).reduce((a, b) => a + Number(b), 0);
+  const savings = totalBudget - totalSpent;
+
+  document.getElementById('monthLabel').textContent =
+    new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+  const budgetUsage = totalBudget > 0 ? Math.round(Math.min(100, (totalSpent / totalBudget) * 100)) : 0;
+  const topCategoryKey = Object.keys(catTotals)
+    .filter(k => catTotals[k] > 0)
+    .sort((a, b) => catTotals[b] - catTotals[a])[0] || '';
+
+  document.getElementById('heroBudgetUsage').textContent = `${budgetUsage}%`;
+  document.getElementById('heroTopCategory').textContent = topCategoryKey ? CATEGORIES[topCategoryKey].label : 'None';
+  document.getElementById('heroProjectedBalance').textContent = fmt(savings);
+
+  // Forecast
+  document.getElementById('forecastAmt').textContent = fmt(forecastMonthEnd());
+
+  // Insights
+  const insights = generateInsights();
+  if (insights.length > 0) {
+    document.getElementById('insightsPanel').style.display = 'block';
+    document.getElementById('insightsList').innerHTML = insights.map(i => `
+      <div class="insight-item ${i.type}">
+        <span class="insight-icon">${i.icon}</span>
+        <span>${i.text}</span>
+      </div>`).join('');
+  }
+
+  // Summary cards
+  const bestSavings = getBestSavingsMonth(expenses);
+  const highestDay = getHighestSpendingDay(expenses);
+
+  const cards = [
+    { label: 'Total Spent', value: fmt(totalSpent), sub: 'This month', cls: 'card-accent' },
+    { label: 'Monthly Budget', value: fmt(totalBudget), sub: 'Total across categories', cls: '' },
+    { label: savings >= 0 ? 'Budget Left' : 'Over Budget', value: fmt(Math.abs(savings)),
+      sub: savings >= 0 ? 'Remaining to spend' : 'Exceeded budget', cls: savings >= 0 ? 'card-success' : 'card-danger' },
+    { label: 'Transactions', value: expenses.filter(e => expenseMonth(e) === month).length, sub: 'This month', cls: '' },
+    { label: 'Best Savings Month', value: bestSavings ? fmt(bestSavings.savings) : '—',
+      sub: bestSavings ? `${new Date(bestSavings.month + '-01').toLocaleString('en-IN', { month: 'short', year: 'numeric' })}` : 'No full months', cls: 'card-success' },
+    { label: 'Highest Spending Day', value: highestDay ? fmt(highestDay.amount) : '—',
+      sub: highestDay ? `${new Date(highestDay.date).toLocaleDateString('en-IN', { day: 'short', month: 'short' })}` : 'No data', cls: 'card-accent' },
+  ];
+  document.getElementById('summaryCards').innerHTML = cards.map(c => `
+    <div class="card ${c.cls}">
+      <div class="card-label">${c.label}</div>
+      <div class="card-value">${c.value}</div>
+      <div class="card-sub">${c.sub}</div>
+    </div>`).join('');
+
+  // Bar Chart
+  const catKeys = Object.keys(CATEGORIES).filter(k => catTotals[k] > 0);
+  const chartOpts = {
+    responsive: true,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } } },
+    scales: {
+      x: { ticks: { color: '#6b6b8a', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#ffffff08' } },
+      y: { ticks: { color: '#6b6b8a', font: { family: 'DM Mono', size: 10 }, callback: v => '₹' + v.toLocaleString('en-IN') }, grid: { color: '#ffffff08' } }
+    }
+  };
+
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: catKeys.map(k => CATEGORIES[k].label),
+      datasets: [{ data: catKeys.map(k => catTotals[k]),
+        backgroundColor: catKeys.map(k => CATEGORIES[k].color + '99'),
+        borderColor: catKeys.map(k => CATEGORIES[k].color),
+        borderWidth: 1, borderRadius: 5 }]
+    },
+    options: chartOpts
+  });
+
+  const weeklyTrend = getWeeklyTrend(expenses, 4);
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: weeklyTrend.labels,
+      datasets: [{
+        data: weeklyTrend.totals,
+        borderColor: 'var(--accent)',
+        backgroundColor: 'rgba(124,109,240,0.18)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 3,
+        pointBackgroundColor: 'var(--accent)'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } } },
+      scales: {
+        x: { ticks: { color: '#6b6b8a', font: { family: 'DM Mono', size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#6b6b8a', font: { family: 'DM Mono', size: 10 }, callback: v => fmt(v) }, grid: { color: '#ffffff08' } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: catKeys.map(k => CATEGORIES[k].label),
+      datasets: [{ data: catKeys.map(k => catTotals[k]),
+        backgroundColor: catKeys.map(k => CATEGORIES[k].color + 'cc'),
+        borderColor: 'var(--surface)', borderWidth: 2 }]
+    },
+    options: { cutout: '68%', responsive: true, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.raw)}` } } } }
+  });
+
+  document.getElementById('catLegend').innerHTML = catKeys.map(k => `
+    <div class="cat-row">
+      <span class="cat-name"><span class="cat-dot" style="background:${CATEGORIES[k].color}"></span>${CATEGORIES[k].label}</span>
+      <span class="cat-amount">${fmt(catTotals[k])}</span>
+    </div>`).join('');
+
+  function getWeeklyTrend(expenses, weeks) {
+    const result = { labels: [], totals: [] };
+    const today = new Date();
+    for (let i = weeks - 1; i >= 0; i -= 1) {
+      const start = new Date(today);
+      start.setDate(today.getDate() - i * 7);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const spent = expenses.reduce((sum, e) => {
+        const date = new Date(e.date);
+        return date >= start && date <= end ? sum + Number(e.amount) : sum;
+      }, 0);
+      result.labels.push(`${start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} - ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`);
+      result.totals.push(spent);
+    }
+    return result;
+  }
+
+  // Budget Progress
+  document.getElementById('budgetProgress').innerHTML = Object.keys(CATEGORIES).map(k => {
+    const spent = catTotals[k] || 0;
+    const budget = Number(budgets[k]) || 0;
+    const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+    const over = spent > budget && budget > 0;
+    return `
+    <div class="progress-item ${over ? 'progress-over' : ''}">
+      <div class="progress-header">
+        <span class="progress-name"><span style="font-size:1rem">${CATEGORIES[k].icon}</span>${CATEGORIES[k].label}</span>
+        <span class="progress-amounts"><span>${fmt(spent)}</span> / ${fmt(budget)}</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" style="width:${pct}%;background:${over ? 'var(--accent2)' : CATEGORIES[k].color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Recent expenses
+  const recent = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+  if (recent.length === 0) {
+    document.getElementById('recentTable').innerHTML = `
+      <div class="empty-state"><span class="emoji">📭</span><p>No expenses yet. <a href="add.html" style="color:var(--accent)">Add your first one →</a></p></div>`;
+  } else {
+    document.getElementById('recentTable').innerHTML = `
+      <table>
+        <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead>
+        <tbody>${recent.map(e => `
+          <tr>
+            <td style="color:var(--muted)">${fmtDate(e.date)}</td>
+            <td>${catBadge(e.category)}</td>
+            <td>${e.description || '—'}</td>
+            <td class="amount-cell">${fmt(e.amount)}</td>
+            <td>
+              <a href="add.html?id=${e.id}" class="btn-icon" title="Edit">✎</a>
+              <button class="btn-icon delete" onclick="delExp('${e.id}')" title="Delete">✕</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+});
+
+function delExp(id) {
+  if (!confirm('Delete this expense?')) return;
+  DB.deleteExpense(id);
+  showToast('Expense deleted');
+  setTimeout(() => location.reload(), 800);
+}
+</script>
+</body>
+</html>

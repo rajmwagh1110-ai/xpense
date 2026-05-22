@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Expenses</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>XPense</h1>
+    <span>Tracker</span>
+  </div>
+  <span class="nav-section">Menu</span>
+  <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
+  <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
+  <a href="expenses.html" class="nav-link"><span class="nav-icon">≡</span><span>All Expenses</span></a>
+  <a href="budget.html" class="nav-link"><span class="nav-icon">◎</span><span>Budget Settings</span></a>
+  <a href="reports.html" class="nav-link"><span class="nav-icon">↗</span><span>Reports</span></a>
+  <a href="goals.html" class="nav-link"><span class="nav-icon">🎯</span><span>Goals</span></a>
+  <a href="settings.html" class="nav-link"><span class="nav-icon">⚙</span><span>Settings</span></a>
+</nav>
+
+<main class="main">
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="page-title">All Expenses</div>
+      <div class="page-subtitle" id="resultCount">Loading…</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="exportVisible()">↓ Export CSV</button>
+      <button class="btn btn-outline" onclick="document.getElementById('csvImportFile').click()">↑ Import CSV</button>
+      <input type="file" id="csvImportFile" accept=".csv" style="display:none" onchange="importCSVFile(this.files[0])">
+      <h2>Filters</h2>
+      <input type="text" id="searchInput" class="filter-input" placeholder="Search description, notes, tags…" style="width:180px">
+      <input type="text" id="tagFilter" class="filter-input" placeholder="Filter tag…" style="width:140px">
+      <select id="catFilter" class="filter-select">
+        <option value="">All Categories</option>
+      </select>
+      <input type="month" id="monthFilter" class="filter-input">
+      <input type="date" id="dateFrom" class="filter-input" placeholder="From">
+      <input type="date" id="dateTo" class="filter-input" placeholder="To">
+      <button class="btn btn-outline" onclick="clearFilters()" style="font-size:0.72rem;padding:7px 12px">✕ Clear</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div id="tableContainer"></div>
+  </div>
+
+  <!-- Total summary -->
+  <div style="display:flex;justify-content:flex-end;margin-top:12px;font-size:0.82rem;color:var(--muted)">
+    Showing total: <span id="filteredTotal" style="color:var(--text);margin-left:8px;font-family:'Syne',sans-serif;font-weight:700"></span>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+let allExpenses = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Populate category filter
+  const sel = document.getElementById('catFilter');
+  Object.entries(getActiveCategories()).forEach(([k, v]) => {
+  // Default month filter = current month
+  document.getElementById('monthFilter').value = currentMonth();
+
+  allExpenses = [...DB.getExpenses()].sort((a, b) => new Date(b.date) - new Date(a.date));
+  render();
+
+  ['searchInput', 'tagFilter', 'catFilter', 'monthFilter', 'dateFrom', 'dateTo'].forEach(id => {
+    document.getElementById(id).addEventListener('input', render);
+  });
+});
+
+function getFiltered() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const tagQuery = document.getElementById('tagFilter').value.toLowerCase();
+  const cat = document.getElementById('catFilter').value;
+  const month = document.getElementById('monthFilter').value;
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+
+  return allExpenses.filter(e => {
+    const desc = (e.description || '').toLowerCase();
+    const notes = (e.notes || '').toLowerCase();
+    const tags = (e.tags || []).map(t => t.toLowerCase()).join(' ');
+    if (search && !(desc.includes(search) || notes.includes(search) || tags.includes(search))) return false;
+    if (tagQuery && !tags.includes(tagQuery)) return false;
+    if (cat && e.category !== cat) return false;
+    if (month && expenseMonth(e) !== month) return false;
+    if (from && e.date < from) return false;
+    if (to && e.date > to) return false;
+    return true;
+  });
+}
+
+function render() {
+  const filtered = getFiltered();
+  const total = filtered.reduce((s, e) => s + Number(e.amount), 0);
+
+  document.getElementById('resultCount').textContent = `${filtered.length} transaction${filtered.length !== 1 ? 's' : ''}`;
+  document.getElementById('filteredTotal').textContent = fmt(total);
+
+  if (filtered.length === 0) {
+    document.getElementById('tableContainer').innerHTML = `
+      <div class="empty-state">
+        <span class="emoji">🔍</span>
+        <p>No expenses match your filters.<br><a href="add.html" style="color:var(--accent)">Add an expense →</a></p>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('tableContainer').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Date</th>
+        <th>Category</th>
+        <th>Description</th>
+        <th>Payment</th>
+        <th style="text-align:right">Amount</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${filtered.map(e => `
+        <tr>
+          <td style="color:var(--muted);white-space:nowrap">${fmtDate(e.date)}</td>
+          <td>${catBadge(e.category)}</td>
+          <td>${e.description || '—'}${e.notes ? `<br><span style="font-size:0.65rem;color:var(--muted)">${e.notes}</span>` : ''}${(e.tags || []).length ? `<br><span class="tag-chip">${(e.tags || []).map(t => `<span>${t}</span>`).join('')}</span>` : ''}</td>
+          <td style="color:var(--muted);font-size:0.72rem;text-transform:capitalize">${e.payment || 'cash'}</td>
+          <td class="amount-cell" style="text-align:right">${fmt(e.amount)}</td>
+          <td style="white-space:nowrap">
+            <a href="add.html?id=${e.id}" class="btn-icon" title="Edit">✎</a>
+            <button class="btn-icon delete" onclick="delExp('${e.id}')" title="Delete">✕</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function delExp(id) {
+  if (!confirm('Delete this expense?')) return;
+  DB.deleteExpense(id);
+  allExpenses = allExpenses.filter(e => e.id !== id);
+  showToast('Expense deleted');
+  render();
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('catFilter').value = '';
+  document.getElementById('monthFilter').value = '';
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  render();
+}
+
+function exportVisible() {
+  exportCSV(getFiltered());
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Settings</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo"><h1>XPense</h1><span>Tracker</span></div>
+  <span class="nav-section">Menu</span>
+  <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
+  <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
+  <a href="expenses.html" class="nav-link"><span class="nav-icon">≡</span><span>All Expenses</span></a>
+  <a href="budget.html" class="nav-link"><span class="nav-icon">◎</span><span>Budget Settings</span></a>
+  <a href="reports.html" class="nav-link"><span class="nav-icon">↗</span><span>Reports</span></a>
+  <a href="goals.html" class="nav-link"><span class="nav-icon">🎯</span><span>Goals</span></a>
+  <a href="settings.html" class="nav-link"><span class="nav-icon">⚙</span><span>Settings</span></a>
+</nav>
+
+<main class="main">
+  <div class="page-header">
+    <div class="page-title">Settings</div>
+    <div class="page-subtitle">Customize your XPense experience</div>
+  </div>
+
+  <!-- Appearance -->
+  <div class="settings-section">
+    <div class="settings-section-title">🎨 Appearance</div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Theme</div>
+        <div class="settings-sublabel">Switch between light and dark mode</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="themeToggleSwitch" onchange="onThemeChange()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Currency</div>
+        <div class="settings-sublabel">Choose your preferred currency</div>
+      </div>
+      <select id="currencySelect" class="filter-select" onchange="onCurrencyChange()">
+        <option value="INR">₹ Indian Rupee (INR)</option>
+        <option value="USD">$ US Dollar (USD)</option>
+        <option value="EUR">€ Euro (EUR)</option>
+        <option value="GBP">£ British Pound (GBP)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="settings-section">
+    <div class="settings-section-title">🔔 Budget Alerts</div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Budget Alerts</div>
+        <div class="settings-sublabel">Get notified when nearing budget limit</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="alertToggle" onchange="onAlertToggle()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="settings-row" id="alertThresholdRow">
+      <div>
+        <div class="settings-label">Alert Threshold</div>
+        <div class="settings-sublabel">Warn me when I've used this % of a budget</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="range" id="alertThreshold" min="50" max="95" step="5" style="width:100px;accent-color:var(--accent)" oninput="onThresholdChange()">
+        <span id="thresholdVal" style="font-size:0.78rem;color:var(--accent);width:32px;text-align:right"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Categories -->
+  <div class="settings-section">
+    <div class="settings-section-title">🗂️ Custom Categories</div>
+    <div class="settings-row" style="flex-wrap:wrap;gap:10px">
+      <div style="flex:1;min-width:220px">
+        <div class="settings-label">Add Category</div>
+        <div class="settings-sublabel">Create a custom category with icon and color</div>
+      </div>
+      <input type="text" id="newCategoryKey" class="form-input" placeholder="key (e.g. travel)" style="max-width:180px">
+      <input type="text" id="newCategoryLabel" class="form-input" placeholder="label" style="max-width:180px">
+      <input type="text" id="newCategoryIcon" class="form-input" placeholder="icon" style="max-width:120px">
+      <input type="color" id="newCategoryColor" class="form-input" value="#22d3ee" style="max-width:80px">
+      <button class="btn btn-outline" onclick="addCategory()" style="min-width:120px">＋ Add</button>
+    </div>
+    <div class="settings-row" style="flex-direction:column;gap:10px">
+      <div>
+        <div class="settings-label">Saved Categories</div>
+        <div class="settings-sublabel">Custom categories appear in add, budget, and reports</div>
+      </div>
+      <div id="customCategoryList" class="category-list"></div>
+    </div>
+  </div>
+
+  <!-- Data Management -->
+  <div class="settings-section">
+    <div class="settings-section-title">💾 Data Management</div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Export CSV</div>
+        <div class="settings-sublabel">Download all expenses as spreadsheet</div>
+      </div>
+      <button class="btn btn-outline" onclick="exportCSV(DB.getExpenses())">↓ Export</button>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Backup Data</div>
+        <div class="settings-sublabel">Export full app data as JSON</div>
+      </div>
+      <button class="btn btn-outline" onclick="exportJSON()">↓ Backup</button>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Restore Backup</div>
+        <div class="settings-sublabel">Import a previously exported JSON backup</div>
+      </div>
+      <label class="btn btn-outline" style="cursor:pointer">
+        ↑ Restore
+        <input type="file" accept=".json" style="display:none" onchange="importJSON(this.files[0])">
+      </label>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label" style="color:var(--accent2)">Clear All Data</div>
+        <div class="settings-sublabel">Permanently delete all expenses and settings</div>
+      </div>
+      <button class="btn btn-danger" onclick="clearAllData()">⚠ Clear</button>
+    </div>
+  </div>
+
+  <!-- About & Shortcuts -->
+  <div class="settings-section">
+    <div class="settings-section-title">⌨️ Keyboard Shortcuts</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+      <div class="shortcut-card"><span>New expense</span><kbd>N</kbd></div>
+      <div class="shortcut-card"><span>Dashboard</span><kbd>D</kbd></div>
+      <div class="shortcut-card"><span>Expenses</span><kbd>E</kbd></div>
+      <div class="shortcut-card"><span>Budget</span><kbd>B</kbd></div>
+      <div class="shortcut-card"><span>Reports</span><kbd>R</kbd></div>
+      <div class="shortcut-card"><span>Toggle theme</span><kbd>T</kbd></div>
+      <div class="shortcut-card"><span>Keyboard help</span><kbd>?</kbd></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="settings-section">
+    <div class="settings-section-title">📊 Your Stats</div>
+    <div id="statsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const settings = DB.getSettings();
+
+  document.getElementById('themeToggleSwitch').checked = settings.theme === 'light';
+  document.getElementById('currencySelect').value = settings.currency || 'INR';
+  document.getElementById('alertToggle').checked = settings.budgetAlerts !== false;
+  document.getElementById('alertThreshold').value = settings.alertThreshold || 80;
+  document.getElementById('thresholdVal').textContent = (settings.alertThreshold || 80) + '%';
+
+  renderCategoryManager();
+  renderStats();
+});
+
+function onThemeChange() {
+  const settings = DB.getSettings();
+  settings.theme = document.getElementById('themeToggleSwitch').checked ? 'light' : 'dark';
+  DB.saveSettings(settings);
+  applyTheme();
+}
+
+function renderCategoryManager() {
+  const container = document.getElementById('customCategoryList');
+  const categories = DB.getCategories();
+  container.innerHTML = Object.entries(categories).map(([key, cat]) => `
+    <div class="settings-category-card">
+      <div>
+        <div>${cat.icon || '◈'} <strong>${cat.label}</strong></div>
+        <div style="font-size:0.75rem;color:var(--muted)">${key}</div>
+      </div>
+      <button class="category-remove-btn" onclick="removeCategory('${key}')">Remove</button>
+    </div>`).join('') || '<div style="color:var(--muted)">No custom categories yet.</div>';
+}
+
+function addCategory() {
+  const key = document.getElementById('newCategoryKey').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const label = document.getElementById('newCategoryLabel').value.trim();
+  const icon = document.getElementById('newCategoryIcon').value.trim() || '◈';
+  const color = document.getElementById('newCategoryColor').value;
+  if (!key || !label) { showToast('Enter a category key and label', 'error'); return; }
+  const existing = DB.getCategories();
+  if (existing[key] || CATEGORIES[key]) { showToast('Category key already exists', 'error'); return; }
+  existing[key] = { label, icon, color };
+  DB.saveCategories(existing);
+  showToast('Custom category added!');
+  document.getElementById('newCategoryKey').value = '';
+  document.getElementById('newCategoryLabel').value = '';
+  document.getElementById('newCategoryIcon').value = '';
+  renderCategoryManager();
+}
+
+function removeCategory(key) {
+  if (!confirm(`Remove category '${key}'?`)) return;
+  const existing = DB.getCategories();
+  delete existing[key];
+  DB.saveCategories(existing);
+  showToast('Category removed');
+  renderCategoryManager();
+}
+
+function onCurrencyChange() {
+  const settings = DB.getSettings();
+  settings.currency = document.getElementById('currencySelect').value;
+  DB.saveSettings(settings);
+  showToast('Currency updated!');
+}
+
+function onAlertToggle() {
+  const settings = DB.getSettings();
+  settings.budgetAlerts = document.getElementById('alertToggle').checked;
+  DB.saveSettings(settings);
+}
+
+function onThresholdChange() {
+  const val = document.getElementById('alertThreshold').value;
+  document.getElementById('thresholdVal').textContent = val + '%';
+  const settings = DB.getSettings();
+  settings.alertThreshold = parseInt(val);
+  DB.saveSettings(settings);
+}
+
+function clearAllData() {
+  if (!confirm('This will permanently delete ALL expenses, budgets, and goals. Are you sure?')) return;
+  if (!confirm('Really sure? This cannot be undone.')) return;
+  localStorage.clear();
+  showToast('All data cleared');
+  setTimeout(() => location.href = 'index.html', 1000);
+}
+
+function renderStats() {
+  const expenses = DB.getExpenses();
+  const streak = DB.getStreak();
+  const totalAll = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const months = [...new Set(expenses.map(e => expenseMonth(e)))].length;
+  const topCat = (() => {
+    const totals = {};
+    expenses.forEach(e => totals[e.category] = (totals[e.category] || 0) + Number(e.amount));
+    const top = Object.entries(totals).sort((a,b) => b[1]-a[1])[0];
+    const categories = getActiveCategories();
+    return top ? categories[top[0]]?.label || top[0] : '—';
+  })();
+
+  document.getElementById('statsGrid').innerHTML = [
+    { label: 'Total Expenses', value: expenses.length },
+    { label: 'Total Spent', value: fmt(totalAll) },
+    { label: 'Months Tracked', value: months },
+    { label: 'Logging Streak', value: `🔥 ${streak.count} days` },
+    { label: 'Top Category', value: topCat },
+    { label: 'Avg per Month', value: months > 0 ? fmt(totalAll / months) : '—' },
+  ].map(s => `
+    <div style="background:var(--surface2);border-radius:10px;padding:14px 16px">
+      <div style="font-size:0.62rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">${s.label}</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem">${s.value}</div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>

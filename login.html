@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Login</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: var(--bg);
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Ambient background orbs */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before {
+      width: 500px; height: 500px;
+      background: #7c6df015;
+      top: -100px; left: -100px;
+    }
+    body::after {
+      width: 400px; height: 400px;
+      background: #f06d7c0a;
+      bottom: -80px; right: -80px;
+    }
+
+    .login-wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    /* Brand header */
+    .brand {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .brand-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, #7c6df0, #a78bfa);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      box-shadow: 0 0 32px #7c6df040;
+    }
+
+    .brand h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.8rem;
+      letter-spacing: -1px;
+      color: var(--text);
+    }
+
+    .brand p {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* Card */
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 24px 64px #00000060;
+    }
+
+    /* Tab switcher */
+    .tab-row {
+      display: flex;
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 28px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 12px #7c6df040;
+    }
+
+    /* Form fields */
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
+    }
+
+    .field-wrap {
+      position: relative;
+    }
+
+    .field-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 0.85rem;
+      pointer-events: none;
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      padding: 11px 14px 11px 36px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px #7c6df018;
+    }
+
+    .field input::placeholder { color: var(--muted); }
+
+    /* Password toggle */
+    .pw-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 2px 4px;
+      transition: color 0.2s;
+    }
+    .pw-toggle:hover { color: var(--text); }
+
+    /* Submit button */
+    .submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 6px;
+      letter-spacing: 0.5px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .submit-btn:hover {
+      background: #6a5ce0;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px #7c6df040;
+    }
+
+    .submit-btn:active { transform: translateY(0); }
+
+    /* Error / success message */
+    .msg-box {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .msg-box.error {
+      background: #f06d7c15;
+      border: 1px solid #f06d7c40;
+      color: var(--accent2);
+      display: block;
+    }
+
+    .msg-box.success {
+      background: #4ade8015;
+      border: 1px solid #4ade8040;
+      color: #4ade80;
+      display: block;
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--muted);
+      font-size: 0.65rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Demo hint */
+    .demo-hint {
+      text-align: center;
+      font-size: 0.67rem;
+      color: var(--muted);
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+
+    .demo-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      padding: 8px 16px;
+      border-radius: 7px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.2s;
+    }
+    .demo-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* User switcher (shown when accounts exist) */
+    .saved-accounts {
+      margin-bottom: 20px;
+    }
+
+    .saved-accounts-label {
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .account-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      font-size: 0.72rem;
+      color: var(--text);
+      cursor: pointer;
+      margin: 3px;
+      transition: all 0.2s;
+    }
+    .account-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .account-chip .avatar {
+      width: 18px; height: 18px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      color: #fff;
+    }
+
+    /* Shimmer on submit button */
+    .submit-btn::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, #ffffff20, transparent);
+      transform: skewX(-20deg);
+      animation: shimmer 2.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { left: -100%; }
+      60%, 100% { left: 150%; }
+    }
+
+    /* Fade in animation */
+    .auth-card {
+      animation: fadeUp 0.4s ease forwards;
+    }
+    .brand {
+      animation: fadeUp 0.3s ease forwards;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+  <div class="brand">
+    <div class="brand-logo">
+      <div class="brand-icon">◈</div>
+      <h1>XPense</h1>
+    </div>
+    <p>Your personal expense tracker</p>
+  </div>
+
+  <div class="auth-card">
+    <!-- Tab switcher -->
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+      <button class="tab-btn" onclick="switchTab('signup')">Create Account</button>
+    </div>
+
+    <!-- Saved accounts quick-access -->
+    <div class="saved-accounts" id="savedAccounts" style="display:none">
+      <div class="saved-accounts-label">Quick Access</div>
+      <div id="accountChips"></div>
+      <div class="divider">or enter manually</div>
+    </div>
+
+    <!-- Message box -->
+    <div class="msg-box" id="msgBox"></div>
+
+    <!-- LOGIN FORM -->
+    <div id="loginForm">
+      <div class="field">
+        <label>Username</label>
+        <div class="field-wrap">
+          <span class="field-icon">◉</span>
+          <input type="text" id="loginUser" placeholder="your username" autocomplete="username">
+        </div>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="field-wrap">
+          <span class="field-icon">⬡</span>
+          <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter') doLogin()">
+          <button class="pw-toggle" onclick="togglePw('loginPass', this)">👁</button>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="doLogin()">Sign In →</button>
+
+      <div class="divider">no account yet?</div>
+      <button class="demo-btn" onclick="switchTab('signup')">＋ Create a free account</button>
+    </div>
+
+    <!-- SIGNUP FORM -->
+    <div id="signupForm" style="display:none">
+      <div class="field">
+        <label>Display Name</label>
+        <div class="field-wrap">
+          <span class="field-icon">✦</span>
+          <input type="text" id="signupName" placeholder="e.g. Rahul" autocomplete="name">
+        </div>
+      </div>
+      <div class="field">
+        <label>Username</label>
+        <div class="field-wrap">
+          <span class="field-icon">◉</span>
+          <input type="text" id="signupUser" placeholder="choose a username" autocomplete="username">
+        </div>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="field-wrap">
+          <span class="field-icon">⬡</span>
+          <input type="password" id="signupPass" placeholder="min. 6 characters" autocomplete="new-password"
+            onkeydown="if(event.key==='Enter') doSignup()">
+          <button class="pw-toggle" onclick="togglePw('signupPass', this)">👁</button>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="doSignup()">Create Account →</button>
+
+      <div class="demo-hint">Your data is stored locally in this browser.<br>Each account has its own expenses & budget.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Auth Storage ─────────────────────────────────────────────────────────────
+const Auth = {
+  getUsers: () => {
+    try { return JSON.parse(localStorage.getItem('xpense_users') || '{}'); } catch { return {}; }
+  },
+  saveUsers: (users) => localStorage.setItem('xpense_users', JSON.stringify(users)),
+
+  register(username, password, name) {
+    const users = this.getUsers();
+    if (users[username]) return { ok: false, msg: 'Username already taken.' };
+    users[username] = { password, name, createdAt: Date.now() };
+    this.saveUsers(users);
+    return { ok: true };
+  },
+
+  login(username, password) {
+    const users = this.getUsers();
+    const user = users[username];
+    if (!user) return { ok: false, msg: 'Username not found.' };
+    if (user.password !== password) return { ok: false, msg: 'Incorrect password.' };
+    return { ok: true, name: user.name };
+  },
+
+  setSession(username, name) {
+    localStorage.setItem('xpense_session', JSON.stringify({ username, name, ts: Date.now() }));
+    // Namespace expenses and budgets per user
+    localStorage.setItem('xpense_active_user', username);
+  },
+
+  getSession() {
+    try { return JSON.parse(localStorage.getItem('xpense_session')); } catch { return null; }
+  },
+
+  logout() {
+    localStorage.removeItem('xpense_session');
+    localStorage.removeItem('xpense_active_user');
+  }
+};
+
+// ─── Per-user data namespacing ─────────────────────────────────────────────
+// We override localStorage keys by prefixing with username so each user has
+// their own expenses and budgets. The main app.js uses keys 'expenses' and
+// 'budgets' — we intercept them here before redirecting.
+function namespaceDataForUser(username) {
+  // app.js reads/writes user-specific localStorage keys.
+  const keys = ['expenses', 'budgets', 'goals', 'settings', 'streak'];
+  keys.forEach((key) => {
+    const namespaced = localStorage.getItem(`xpense_data_${username}_${key}`);
+    if (namespaced) localStorage.setItem(key, namespaced);
+    else localStorage.removeItem(key);
+  });
+}
+
+// ─── UI Helpers ───────────────────────────────────────────────────────────────
+function showMsg(msg, type = 'error') {
+  const box = document.getElementById('msgBox');
+  box.textContent = (type === 'error' ? '✕ ' : '✓ ') + msg;
+  box.className = `msg-box ${type}`;
+}
+
+function clearMsg() {
+  document.getElementById('msgBox').className = 'msg-box';
+}
+
+function switchTab(tab) {
+  clearMsg();
+  const loginForm = document.getElementById('loginForm');
+  const signupForm = document.getElementById('signupForm');
+  const tabs = document.querySelectorAll('.tab-btn');
+
+  if (tab === 'login') {
+    loginForm.style.display = 'block';
+    signupForm.style.display = 'none';
+    tabs[0].classList.add('active');
+    tabs[1].classList.remove('active');
+    renderSavedAccounts();
+  } else {
+    loginForm.style.display = 'none';
+    signupForm.style.display = 'block';
+    tabs[1].classList.add('active');
+    tabs[0].classList.remove('active');
+    document.getElementById('savedAccounts').style.display = 'none';
+  }
+}
+
+function togglePw(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function renderSavedAccounts() {
+  const users = Auth.getUsers();
+  const keys = Object.keys(users);
+  const container = document.getElementById('savedAccounts');
+  const chips = document.getElementById('accountChips');
+  if (keys.length === 0) { container.style.display = 'none'; return; }
+  container.style.display = 'block';
+  chips.innerHTML = keys.map(u => `
+    <span class="account-chip" onclick="quickLogin('${u}')">
+      <span class="avatar">${users[u].name ? users[u].name[0].toUpperCase() : u[0].toUpperCase()}</span>
+      ${users[u].name || u}
+    </span>`).join('');
+}
+
+function quickLogin(username) {
+  document.getElementById('loginUser').value = username;
+  document.getElementById('loginPass').focus();
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+function doLogin() {
+  clearMsg();
+  const username = document.getElementById('loginUser').value.trim().toLowerCase();
+  const password = document.getElementById('loginPass').value;
+
+  if (!username) { showMsg('Please enter your username.'); return; }
+  if (!password) { showMsg('Please enter your password.'); return; }
+
+  const result = Auth.login(username, password);
+  if (!result.ok) { showMsg(result.msg); return; }
+
+  Auth.setSession(username, result.name);
+  namespaceDataForUser(username);
+  showMsg(`Welcome back, ${result.name || username}! Redirecting…`, 'success');
+  setTimeout(() => location.href = 'index.html', 900);
+}
+
+function doSignup() {
+  clearMsg();
+  const name = document.getElementById('signupName').value.trim();
+  const username = document.getElementById('signupUser').value.trim().toLowerCase();
+  const password = document.getElementById('signupPass').value;
+
+  if (!name) { showMsg('Please enter your display name.'); return; }
+  if (!username) { showMsg('Please choose a username.'); return; }
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+    showMsg('Username: 3–20 chars, letters/numbers/underscore only.'); return;
+  }
+  if (password.length < 6) { showMsg('Password must be at least 6 characters.'); return; }
+
+  const result = Auth.register(username, password, name);
+  if (!result.ok) { showMsg(result.msg); return; }
+
+  Auth.setSession(username, name);
+  namespaceDataForUser(username);
+  showMsg(`Account created! Welcome, ${name}! Setting up your dashboard…`, 'success');
+  setTimeout(() => location.href = 'index.html', 1000);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+function showActiveSessionNotice(session) {
+  if (!session || !session.username) return;
+
+  const box = document.getElementById('msgBox');
+  box.textContent = `✓ Logged in as ${session.name || session.username}.`;
+  box.className = 'msg-box success';
+
+  const card = document.querySelector('.auth-card');
+  const actionBar = document.createElement('div');
+  actionBar.style.marginTop = '16px';
+  actionBar.style.display = 'flex';
+  actionBar.style.gap = '10px';
+  actionBar.style.flexWrap = 'wrap';
+
+  const continueBtn = document.createElement('button');
+  continueBtn.type = 'button';
+  continueBtn.className = 'demo-btn';
+  continueBtn.textContent = 'Continue to dashboard';
+  continueBtn.onclick = () => location.href = 'index.html';
+
+  const logoutBtn = document.createElement('button');
+  logoutBtn.type = 'button';
+  logoutBtn.className = 'demo-btn';
+  logoutBtn.textContent = 'Logout and switch account';
+  logoutBtn.onclick = () => {
+    Auth.logout();
+    window.location.reload();
+  };
+
+  actionBar.appendChild(continueBtn);
+  actionBar.appendChild(logoutBtn);
+  card.insertBefore(actionBar, document.getElementById('loginForm'));
+}
+
+const session = Auth.getSession();
+if (session && session.username) {
+  namespaceDataForUser(session.username);
+  showActiveSessionNotice(session);
+} else {
+  renderSavedAccounts();
+}
+</script>
+</body>
+</html>

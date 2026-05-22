@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Reports</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo"><h1>XPense</h1><span>Tracker</span></div>
+  <span class="nav-section">Menu</span>
+  <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
+  <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
+  <a href="expenses.html" class="nav-link"><span class="nav-icon">≡</span><span>All Expenses</span></a>
+  <a href="budget.html" class="nav-link"><span class="nav-icon">◎</span><span>Budget Settings</span></a>
+  <a href="reports.html" class="nav-link"><span class="nav-icon">↗</span><span>Reports</span></a>
+  <a href="goals.html" class="nav-link"><span class="nav-icon">🎯</span><span>Goals</span></a>
+  <a href="settings.html" class="nav-link"><span class="nav-icon">⚙</span><span>Settings</span></a>
+</nav>
+
+<main class="main">
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="page-title">Reports</div>
+      <div class="page-subtitle">Monthly spending analysis & trends</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="exportCSV(DB.getExpenses())">↓ Export CSV</button>
+      <button class="btn btn-outline" onclick="exportJSON()">↓ Backup JSON</button>
+    </div>
+  </div>
+
+  <!-- Month vs month cards -->
+  <div class="cards-grid" id="compareCards" style="margin-bottom:28px"></div>
+
+  <!-- Charts -->
+  <div class="reports-grid" style="margin-bottom:20px">
+    <div class="chart-card">
+      <div class="chart-title">This Month vs Last Month</div>
+      <div class="chart-wrap"><canvas id="compareBar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">6-Month Trend</div>
+      <div class="chart-wrap"><canvas id="trendLine"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Day of week heatmap -->
+  <div class="chart-card" style="margin-bottom:20px">
+    <div class="chart-title" style="margin-bottom:14px">📅 Spending by Day of Week</div>
+    <div id="dowChart" style="display:flex;gap:8px;align-items:flex-end;height:80px;padding-bottom:24px;position:relative"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div style="flex:1;text-align:center;font-size:0.62rem;color:var(--muted)">${d}</div>`).join('')}
+    </div>
+  </div>
+
+  <!-- Recurring -->
+  <div class="chart-card" style="margin-bottom:20px">
+    <div class="table-toolbar" style="border-bottom:1px solid var(--border)">
+      <h2>🔄 Recurring Expenses Detected</h2>
+    </div>
+    <div style="padding:16px" id="recurringList"></div>
+  </div>
+
+  <!-- Category comparison table -->
+  <div class="table-card">
+    <div class="table-toolbar">
+      <h2>Category Breakdown — Month Comparison</h2>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th style="text-align:right">Last Month</th>
+          <th style="text-align:right">This Month</th>
+          <th style="text-align:right">Change</th>
+          <th style="text-align:right">Budget</th>
+          <th>Usage</th>
+        </tr>
+      </thead>
+      <tbody id="compareTableBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const expenses = DB.getExpenses();
+  const budgets = DB.getBudgets();
+  const month = currentMonth();
+  const prev = prevMonth();
+
+  const thisMonthTotals = totalByCategory(month, expenses);
+  const prevMonthTotals = totalByCategory(prev, expenses);
+  const thisTotal = totalForMonth(month, expenses);
+  const prevTotal = totalForMonth(prev, expenses);
+  const diff = thisTotal - prevTotal;
+
+  const thisMonthLabel = new Date().toLocaleDateString('en-IN', { month: 'long' });
+  const prevDate = new Date(); prevDate.setMonth(prevDate.getMonth() - 1);
+  const prevMonthLabel = prevDate.toLocaleDateString('en-IN', { month: 'long' });
+
+  // Compare cards
+  document.getElementById('compareCards').innerHTML = [
+    { label: thisMonthLabel, value: fmt(thisTotal), sub: 'Current month', cls: 'card-accent' },
+    { label: prevMonthLabel, value: fmt(prevTotal), sub: 'Last month', cls: '' },
+    { label: 'Change', value: (diff >= 0 ? '+' : '') + fmt(diff), sub: diff >= 0 ? 'Spending increased' : 'Spending decreased', cls: diff <= 0 ? 'card-success' : 'card-danger' },
+    { label: 'Avg / Day', value: fmt(thisTotal / new Date().getDate()), sub: 'This month daily avg', cls: '' }
+  ].map(c => `
+    <div class="card ${c.cls}">
+      <div class="card-label">${c.label}</div>
+      <div class="card-value">${c.value}</div>
+      <div class="card-sub">${c.sub}</div>
+    </div>`).join('');
+
+  const chartDefaults = {
+    plugins: { legend: { labels: { color: '#6b6b8a', font: { family: 'DM Mono', size: 10 } }, tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } } } },
+    scales: {
+      x: { ticks: { color: '#6b6b8a', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#ffffff08' } },
+      y: { ticks: { color: '#6b6b8a', font: { family: 'DM Mono', size: 10 }, callback: v => '₹' + v.toLocaleString('en-IN') }, grid: { color: '#ffffff08' } }
+    }
+  };
+
+  // Compare bar chart
+  new Chart(document.getElementById('compareBar'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(CATEGORIES).map(k => CATEGORIES[k].label),
+      datasets: [
+        { label: prevMonthLabel, data: Object.keys(CATEGORIES).map(k => prevMonthTotals[k] || 0),
+          backgroundColor: '#6b6b8a55', borderColor: '#6b6b8a', borderWidth: 1, borderRadius: 4 },
+        { label: thisMonthLabel, data: Object.keys(CATEGORIES).map(k => thisMonthTotals[k] || 0),
+          backgroundColor: '#7c6df099', borderColor: '#7c6df0', borderWidth: 1, borderRadius: 4 }
+      ]
+    },
+    options: { ...chartDefaults, responsive: true }
+  });
+
+  // 6-month trend line
+  const months6 = [], totals6 = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth() - i);
+    const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months6.push(d.toLocaleDateString('en-IN', { month: 'short' }));
+    totals6.push(totalForMonth(mKey, expenses));
+  }
+  new Chart(document.getElementById('trendLine'), {
+    type: 'line',
+    data: {
+      labels: months6,
+      datasets: [{ label: 'Monthly Spending', data: totals6,
+        borderColor: '#7c6df0', backgroundColor: '#7c6df020',
+        tension: 0.4, fill: true, pointBackgroundColor: '#7c6df0', pointRadius: 5 }]
+    },
+    options: { ...chartDefaults, responsive: true }
+  });
+
+  // Day of week heatmap
+  const dowTotals = [0,0,0,0,0,0,0];
+  const dowCounts = [0,0,0,0,0,0,0];
+  expenses.forEach(e => {
+    if (expenseMonth(e) === month) {
+      const day = new Date(e.date).getDay();
+      dowTotals[day] += Number(e.amount);
+      dowCounts[day]++;
+    }
+  });
+  const maxDow = Math.max(...dowTotals, 1);
+  const dowEl = document.getElementById('dowChart');
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  dowEl.innerHTML = dowTotals.map((amt, i) => {
+    const h = Math.max((amt / maxDow) * 64, 4);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px" title="${days[i]}: ${fmt(amt)}">
+      <div style="font-size:0.62rem;color:var(--muted)">${amt > 0 ? fmt(amt).replace('₹','') : ''}</div>
+      <div style="width:100%;height:${h}px;background:var(--accent);border-radius:4px 4px 0 0;opacity:0.7;transition:opacity 0.2s" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.7"></div>
+    </div>`;
+  }).join('');
+
+  // Recurring detection
+  const recurring = detectRecurring(expenses);
+  const recurringEl = document.getElementById('recurringList');
+  if (recurring.length === 0) {
+    recurringEl.innerHTML = `<div style="color:var(--muted);font-size:0.78rem">No recurring patterns detected yet. Add more expenses over time!</div>`;
+  } else {
+    recurringEl.innerHTML = `<div class="recurring-list">${recurring.slice(0,6).map(r => `
+      <div class="recurring-item">
+        <div class="recurring-item-left">
+          ${catBadge(r.category)}
+          <span style="font-size:0.78rem">${r.description}</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:0.78rem;font-weight:600">${fmt(r.avgAmount)}/avg</div>
+          <div class="recurring-count">× ${r.count} times, ${r.months.length} months</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  // Category comparison table
+  document.getElementById('compareTableBody').innerHTML = Object.keys(CATEGORIES).map(k => {
+    const p = prevMonthTotals[k] || 0;
+    const c = thisMonthTotals[k] || 0;
+    const change = c - p;
+    const budget = Number(budgets[k]) || 0;
+    const pct = budget > 0 ? Math.min((c / budget) * 100, 100) : 0;
+    const over = c > budget && budget > 0;
+    const v = CATEGORIES[k];
+    return `
+    <tr>
+      <td>${catBadge(k)}</td>
+      <td style="text-align:right;color:var(--muted)">${p > 0 ? fmt(p) : '—'}</td>
+      <td style="text-align:right;font-weight:600">${c > 0 ? fmt(c) : '—'}</td>
+      <td style="text-align:right;color:${change > 0 ? 'var(--accent2)' : change < 0 ? 'var(--food)' : 'var(--muted)'}">
+        ${change !== 0 ? (change > 0 ? '▲ ' : '▼ ') + fmt(Math.abs(change)) : '—'}
+      </td>
+      <td style="text-align:right;color:var(--muted)">${budget > 0 ? fmt(budget) : '—'}</td>
+      <td style="min-width:120px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="progress-bar-bg" style="flex:1">
+            <div class="progress-bar-fill" style="width:${pct}%;background:${over ? 'var(--accent2)' : v.color}"></div>
+          </div>
+          <span style="font-size:0.67rem;color:var(--muted);width:36px;text-align:right">${pct.toFixed(0)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+});
+</script>
+</body>
+</html>

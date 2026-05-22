@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Budget Settings</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>XPense</h1>
+    <span>Tracker</span>
+  </div>
+  <span class="nav-section">Menu</span>
+  <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
+  <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
+  <a href="expenses.html" class="nav-link"><span class="nav-icon">≡</span><span>All Expenses</span></a>
+  <a href="budget.html" class="nav-link"><span class="nav-icon">◎</span><span>Budget Settings</span></a>
+  <a href="reports.html" class="nav-link"><span class="nav-icon">↗</span><span>Reports</span></a>
+  <a href="goals.html" class="nav-link"><span class="nav-icon">🎯</span><span>Goals</span></a>
+  <a href="settings.html" class="nav-link"><span class="nav-icon">⚙</span><span>Settings</span></a>
+</nav>
+
+<main class="main">
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="page-title">Budget Settings</div>
+      <div class="page-subtitle">Set monthly limits per category</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span style="font-size:0.78rem;color:var(--muted)">Total Budget: <strong id="totalBudgetDisplay" style="color:var(--accent)"></strong></span>
+      <button class="btn btn-primary" onclick="saveAllBudgets()">💾 Save All</button>
+    </div>
+  </div>
+
+  <!-- Summary overview -->
+  <div class="cards-grid" style="margin-bottom:28px" id="budgetSummaryCards"></div>
+
+  <!-- Budget inputs -->
+  <div class="budget-grid" id="budgetGrid"></div>
+</main>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  renderBudgetPage();
+});
+
+function renderBudgetPage() {
+  const budgets = DB.getBudgets();
+  const month = currentMonth();
+  const catTotals = totalByCategory(month);
+  const categories = getActiveCategories();
+  const totalBudget = Object.values(budgets).reduce((s, v) => s + Number(v), 0);
+  const totalSpent = totalForMonth(month);
+  const overCount = Object.keys(categories).filter(k => (catTotals[k] || 0) > (budgets[k] || 0)).length;
+
+  document.getElementById('totalBudgetDisplay').textContent = fmt(totalBudget);
+
+  // Summary cards
+  document.getElementById('budgetSummaryCards').innerHTML = [
+    { label: 'Total Budget', value: fmt(totalBudget), sub: 'Across all categories', cls: '' },
+    { label: 'Total Spent', value: fmt(totalSpent), sub: 'This month', cls: 'card-accent' },
+    { label: 'Budget Left', value: fmt(Math.max(0, totalBudget - totalSpent)), sub: 'Remaining', cls: 'card-success' },
+    { label: 'Over Budget', value: overCount + ' categories', sub: 'Exceeded limit', cls: overCount > 0 ? 'card-danger' : '' },
+  ].map(c => `
+    <div class="card ${c.cls}">
+      <div class="card-label">${c.label}</div>
+      <div class="card-value">${c.value}</div>
+      <div class="card-sub">${c.sub}</div>
+    </div>`).join('');
+
+  // Budget grid
+  document.getElementById('budgetGrid').innerHTML = Object.entries(categories).map(([k, v]) => {
+    const spent = catTotals[k] || 0;
+    const budget = Number(budgets[k]) || 0;
+    const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+    const over = spent > budget && budget > 0;
+    const warn = pct >= 80 && pct < 100;
+
+    return `
+    <div class="budget-item">
+      <div class="budget-item-header">
+        <div class="budget-icon" style="background:${v.color}20">
+          <span>${v.icon}</span>
+        </div>
+        <div>
+          <div class="budget-name" style="color:${v.color}">${v.label}</div>
+          <div style="font-size:0.65rem;color:var(--muted)">Spent: ${fmt(spent)}</div>
+        </div>
+        ${over ? `<span style="margin-left:auto;font-size:0.65rem;color:var(--accent2);background:#f06d7c15;padding:3px 8px;border-radius:99px">Over</span>` : ''}
+      </div>
+
+      <div class="progress-bar-bg" style="margin-bottom:12px">
+        <div class="progress-bar-fill" style="width:${pct}%;background:${over ? 'var(--accent2)' : v.color}"></div>
+      </div>
+
+      <div class="budget-input-row">
+        <span style="font-size:0.78rem;color:var(--muted)">₹</span>
+        <input type="number" class="form-input" id="budget_${k}" value="${budget}" min="0" step="100"
+          oninput="updateTotal()"
+          style="text-align:right">
+      </div>
+      <div style="font-size:0.65rem;color:var(--muted);margin-top:6px;text-align:right">
+        ${pct.toFixed(0)}% used
+        ${budget > 0 ? `· ${fmt(Math.max(0, budget - spent))} left` : ''}
+        ${warn ? `<span style="color:var(--accent);padding:0 6px;background:#7c6df015;border-radius:999px;margin-left:6px">Warning</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateTotal() {
+  let total = 0;
+  Object.keys(CATEGORIES).forEach(k => {
+    total += parseFloat(document.getElementById(`budget_${k}`)?.value || 0);
+  });
+  document.getElementById('totalBudgetDisplay').textContent = fmt(total);
+}
+
+function saveAllBudgets() {
+  const budgets = {};
+  Object.keys(CATEGORIES).forEach(k => {
+    const val = parseFloat(document.getElementById(`budget_${k}`)?.value || 0);
+    budgets[k] = val;
+  });
+  DB.saveBudgets(budgets);
+  showToast('Budgets saved!');
+  setTimeout(renderBudgetPage, 400);
+}
+</script>
+</body>
+</html>

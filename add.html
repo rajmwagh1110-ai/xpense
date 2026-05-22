@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XPense — Add Expense</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo"><h1>XPense</h1><span>Tracker</span></div>
+  <span class="nav-section">Menu</span>
+  <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
+  <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
+  <a href="expenses.html" class="nav-link"><span class="nav-icon">≡</span><span>All Expenses</span></a>
+  <a href="budget.html" class="nav-link"><span class="nav-icon">◎</span><span>Budget Settings</span></a>
+  <a href="reports.html" class="nav-link"><span class="nav-icon">↗</span><span>Reports</span></a>
+  <a href="goals.html" class="nav-link"><span class="nav-icon">🎯</span><span>Goals</span></a>
+  <a href="settings.html" class="nav-link"><span class="nav-icon">⚙</span><span>Settings</span></a>
+</nav>
+
+<main class="main">
+  <div class="page-header">
+    <div class="page-title" id="formTitle">Add Expense</div>
+    <div class="page-subtitle">Record a new transaction</div>
+  </div>
+
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Amount (₹)</label>
+        <input type="number" id="amount" class="form-input" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" id="date" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" id="description" class="form-input" placeholder="What did you spend on?" oninput="handleDescriptionInput()">
+        <span id="autoDetectBadge" style="display:none" class="auto-detect-badge">✨ Category auto-detected</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select id="category" class="form-select">
+          <option value="">Select category…</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Method</label>
+        <select id="payment" class="form-select">
+          <option value="cash">Cash</option>
+          <option value="upi">UPI</option>
+          <option value="card">Card</option>
+          <option value="netbanking">Net Banking</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Recurring?</label>
+        <select id="recurring" class="form-select">
+          <option value="">One-time</option>
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tags (optional)</label>
+        <input type="text" id="tags" class="form-input" placeholder="e.g. groceries, utilities">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notes (optional)</label>
+        <textarea id="notes" class="form-textarea" rows="3" placeholder="Any extra details…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+
+    <!-- Category preview -->
+    <div id="catPreview" style="display:none;padding:12px;background:var(--surface2);border-radius:8px;margin-bottom:4px;font-size:0.78rem">
+      <span id="catPreviewInner"></span>
+      &nbsp;— Budget this month: <span id="catBudgetInfo" style="color:var(--accent)"></span>
+      &nbsp;| Spent so far: <span id="catSpentInfo" style="color:var(--accent2)"></span>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveExpense()">💾 Save Expense</button>
+      <a href="index.html" class="btn btn-outline">Cancel</a>
+      <button id="deleteBtn" class="btn btn-danger" style="display:none;margin-left:auto" onclick="deleteAndRedirect()">✕ Delete</button>
+    </div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+let editId = null;
+let autoDetected = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('category');
+  Object.entries(getActiveCategories()).forEach(([k, v]) => {
+
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+  const params = new URLSearchParams(location.search);
+  editId = params.get('id');
+  if (editId) {
+    const exp = DB.getExpenses().find(e => e.id === editId);
+    if (exp) {
+      document.getElementById('formTitle').textContent = 'Edit Expense';
+      document.querySelector('.page-subtitle').textContent = 'Update this transaction';
+      document.getElementById('amount').value = exp.amount;
+      document.getElementById('date').value = exp.date;
+      document.getElementById('category').value = exp.category;
+      document.getElementById('description').value = exp.description || '';
+      document.getElementById('tags').value = (exp.tags || []).join(', ');
+      document.getElementById('notes').value = exp.notes || '';
+      document.getElementById('payment').value = exp.payment || 'cash';
+      document.getElementById('recurring').value = exp.recurring || '';
+      document.getElementById('deleteBtn').style.display = 'flex';
+      updateCatPreview();
+    }
+  }
+
+  document.getElementById('category').addEventListener('change', () => {
+    autoDetected = false;
+    document.getElementById('autoDetectBadge').style.display = 'none';
+    updateCatPreview();
+  });
+});
+
+let descTimer = null;
+function handleDescriptionInput() {
+  clearTimeout(descTimer);
+  descTimer = setTimeout(() => {
+    const desc = document.getElementById('description').value;
+    const catSel = document.getElementById('category');
+    if (desc.length >= 3 && !catSel.value) {
+      const detected = detectCategory(desc);
+      if (detected) {
+        catSel.value = detected;
+        autoDetected = true;
+        document.getElementById('autoDetectBadge').style.display = 'inline-flex';
+        updateCatPreview();
+      }
+    } else if (!desc) {
+      document.getElementById('autoDetectBadge').style.display = 'none';
+    }
+  }, 400);
+}
+
+function updateCatPreview() {
+  const cat = document.getElementById('category').value;
+  if (!cat) { document.getElementById('catPreview').style.display = 'none'; return; }
+  const budgets = DB.getBudgets();
+  const month = currentMonth();
+  const catTotals = totalByCategory(month);
+  document.getElementById('catPreview').style.display = 'block';
+  document.getElementById('catPreviewInner').innerHTML = catBadge(cat);
+  document.getElementById('catBudgetInfo').textContent = fmt(budgets[cat] || 0);
+  document.getElementById('catSpentInfo').textContent = fmt(catTotals[cat] || 0);
+}
+
+function saveExpense() {
+  const amount = parseFloat(document.getElementById('amount').value);
+  const date = document.getElementById('date').value;
+  const category = document.getElementById('category').value;
+  const description = document.getElementById('description').value.trim();
+  const tags = document.getElementById('tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const notes = document.getElementById('notes').value.trim();
+  const payment = document.getElementById('payment').value;
+  const recurring = document.getElementById('recurring').value;
+
+  if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+  if (!date) { showToast('Select a date', 'error'); return; }
+  if (!category) { showToast('Select a category', 'error'); return; }
+
+  const expData = { amount, date, category, description, tags, notes, payment, recurring };
+
+  if (editId) {
+    DB.updateExpense(editId, expData);
+    showToast('Expense updated!');
+  } else {
+    DB.addExpense(expData);
+    showToast('Expense added!');
+    document.getElementById('amount').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('notes').value = '';
+    document.getElementById('category').value = '';
+    document.getElementById('recurring').value = '';
+    document.getElementById('catPreview').style.display = 'none';
+    document.getElementById('autoDetectBadge').style.display = 'none';
+  }
+
+  setTimeout(() => location.href = 'expenses.html', 900);
+}
+
+function deleteAndRedirect() {
+  if (!editId) return;
+  if (!confirm('Delete this expense?')) return;
+  DB.deleteExpense(editId);
+  showToast('Expense deleted');
+  setTimeout(() => location.href = 'expenses.html', 800);
+}
+</script>
+</body>
+</html>
