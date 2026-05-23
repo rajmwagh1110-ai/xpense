@@ -9,7 +9,7 @@
 </head>
 <body>
 <nav class="sidebar">
-  <div class="sidebar-logo"><h1>XPense</h1><span>Tracker</span></div>
+  <div class="sidebar-logo logo-rotate"><h1>XPense</h1><span>Tracker</span></div>
   <span class="nav-section">Menu</span>
   <a href="index.html" class="nav-link"><span class="nav-icon">◈</span><span>Dashboard</span></a>
   <a href="add.html" class="nav-link"><span class="nav-icon">＋</span><span>Add Expense</span></a>
@@ -21,7 +21,7 @@
 </nav>
 
 <main class="main">
-  <div class="page-header">
+  <div class="page-header anim-header">
     <div>
       <div class="page-title">Dashboard</div>
       <div class="page-subtitle" id="monthLabel">Loading…</div>
@@ -30,7 +30,7 @@
   </div>
 
   <section class="dashboard-hero">
-    <div class="hero-card">
+    <div class="hero-card anim-card">
       <div class="hero-top">
         <div>
           <div class="hero-title">Financial pulse</div>
@@ -72,11 +72,11 @@
 
   <!-- Charts Row -->
   <div class="charts-row">
-    <div class="chart-card">
+    <div class="chart-card left-slide">
       <div class="chart-title">Spending by Category</div>
       <div class="chart-wrap"><canvas id="barChart"></canvas></div>
     </div>
-    <div class="chart-card">
+    <div class="chart-card right-slide">
       <div class="chart-title">Category Split</div>
       <div class="donut-wrap"><canvas id="donutChart"></canvas></div>
       <div class="cat-legend" id="catLegend"></div>
@@ -84,7 +84,7 @@
   </div>
 
   <!-- Budget Progress -->
-  <div class="chart-card budget-progress-card">
+  <div class="chart-card budget-progress-card anim-card fade-scale-in">
     <div class="budget-card-header">
       <div class="chart-title">Budget Progress</div>
       <span class="forecast-label">Forecast: <strong id="forecastAmt"></strong></span>
@@ -93,7 +93,7 @@
   </div>
 
   <!-- Recent Expenses -->
-  <div class="table-card">
+  <div class="table-card anim-card fade-scale-in">
     <div class="table-toolbar">
       <h2>Recent Expenses</h2>
       <a href="expenses.html" class="btn btn-outline btn-small">View All →</a>

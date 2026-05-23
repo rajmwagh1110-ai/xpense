@@ -9,7 +9,7 @@
 <body>
 
 <nav class="sidebar">
-  <div class="sidebar-logo">
+  <div class="sidebar-logo logo-rotate">
     <h1>XPense</h1>
     <span>Tracker</span>
   </div>
@@ -24,7 +24,7 @@
 </nav>
 
 <main class="main">
-  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+  <div class="page-header anim-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
       <div class="page-title">All Expenses</div>
       <div class="page-subtitle" id="resultCount">Loading…</div>
@@ -47,7 +47,7 @@
   </div>
 
   <!-- Table -->
-  <div class="table-card">
+  <div class="table-card anim-card fade-scale-in">
     <div id="tableContainer"></div>
   </div>
 
@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate category filter
   const sel = document.getElementById('catFilter');
   Object.entries(getActiveCategories()).forEach(([k, v]) => {
+    sel.insertAdjacentHTML('beforeend', `<option value="${k}">${v.label}</option>`);
+  });
+
   // Default month filter = current month
   document.getElementById('monthFilter').value = currentMonth();
 
@@ -125,8 +128,8 @@ function render() {
         <th></th>
       </tr></thead>
       <tbody>
-        ${filtered.map(e => `
-        <tr>
+        ${filtered.map((e, index) => `
+        <tr class="expense-row group-row" style="animation-delay: ${index * 0.05}s;">
           <td style="color:var(--muted);white-space:nowrap">${fmtDate(e.date)}</td>
           <td>${catBadge(e.category)}</td>
           <td>${e.description || '—'}${e.notes ? `<br><span style="font-size:0.65rem;color:var(--muted)">${e.notes}</span>` : ''}${(e.tags || []).length ? `<br><span class="tag-chip">${(e.tags || []).map(t => `<span>${t}</span>`).join('')}</span>` : ''}</td>
@@ -134,15 +137,26 @@ function render() {
           <td class="amount-cell" style="text-align:right">${fmt(e.amount)}</td>
           <td style="white-space:nowrap">
             <a href="add.html?id=${e.id}" class="btn-icon" title="Edit">✎</a>
-            <button class="btn-icon delete" onclick="delExp('${e.id}')" title="Delete">✕</button>
+            <button class="btn-icon delete" onclick="delExp('${e.id}', this)" title="Delete">✕</button>
           </td>
         </tr>`).join('')}
       </tbody>
     </table>`;
 }
 
-function delExp(id) {
+function delExp(id, button) {
   if (!confirm('Delete this expense?')) return;
+  const row = button?.closest('tr');
+  if (row) {
+    row.classList.add('row-exit');
+    setTimeout(() => {
+      DB.deleteExpense(id);
+      allExpenses = allExpenses.filter(e => e.id !== id);
+      showToast('Expense deleted');
+      render();
+    }, 220);
+    return;
+  }
   DB.deleteExpense(id);
   allExpenses = allExpenses.filter(e => e.id !== id);
   showToast('Expense deleted');
