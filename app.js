@@ -107,7 +107,7 @@ const DB = {
   },
 
   getSettings: () => Storage.get(getNamespacedKey('settings'), {
-    theme: 'dark',
+    theme: 'light',
     currency: 'INR',
     budgetAlerts: true,
     alertThreshold: 80
@@ -422,7 +422,7 @@ function updateStreak() {
 // ─── Theme ───────────────────────────────────────────────────────────────────
 function applyTheme() {
   const settings = DB.getSettings();
-  document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
+  document.documentElement.setAttribute('data-theme', settings.theme || 'light');
 }
 
 function toggleTheme() {
